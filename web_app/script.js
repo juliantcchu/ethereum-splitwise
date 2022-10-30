@@ -130,8 +130,9 @@ var BlockchainSplitwise = new ethers.Contract(contractAddress, abi, provider.get
 
 // TODO: Add any helper functions here!
 
-async function _getCreditors(debtor){
-	return []
+async function reconstructIOU(){
+	getAllFunctionCalls
+	return {}
 }
 
 // TODO: Return a list of all users (creditors or debtors) in the system

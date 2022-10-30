@@ -9,18 +9,18 @@ contract Splitwise {
 // DO NOT MODIFY ABOVE THIS
 // ADD YOUR CONTRACT CODE BELOW
 
-    // mapping(address => uint32) public debt;
+    // database for all IOUs
     mapping(address => mapping(address => uint32)) public IOUs;
 
-    // mapping(address => address[]) public creditors;
-
+    // lookup function for IOU amounts
     function lookup(address debtor, address creditor) public view returns (uint32 ret) {
         return IOUs[debtor][creditor];
     }
 
+    // add IOU and remove cycle by cycleAmount if exist
     function add_IOU(address creditor, uint32 amount, address[] memory cycle, uint32 cycleAmount ) public {
         IOUs[msg.sender][creditor] = amount;
-        
+
         //resolve cycle if exist
         for (uint32 i; i < cycle.length; i++){
             require(IOUs[cycle[i]][cycle[i+1 % cycle.length]] >= cycleAmount);
