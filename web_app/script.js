@@ -47,48 +47,19 @@ var abi = [
           "type": "uint32"
         },
         {
-          "internalType": "uint32[]",
+          "internalType": "address[]",
           "name": "cycle",
-          "type": "uint32[]"
+          "type": "address[]"
         },
         {
           "internalType": "uint32",
           "name": "cycleAmount",
           "type": "uint32"
-        },
-        {
-          "internalType": "bool",
-          "name": "addCreditor",
-          "type": "bool"
         }
       ],
       "name": "add_IOU",
       "outputs": [],
       "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "",
-          "type": "address"
-        },
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "name": "creditors",
-      "outputs": [
-        {
-          "internalType": "address",
-          "name": "",
-          "type": "address"
-        }
-      ],
-      "stateMutability": "view",
       "type": "function"
     },
     {
@@ -120,7 +91,7 @@ var abi = [
 abiDecoder.addABI(abi);
 // call abiDecoder.decodeMethod to use this - see 'getAllFunctionCalls' for more
 
-var contractAddress = "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0"; // FIXME: fill this in with your contract's address/hash
+var contractAddress = "0x9A676e781A523b5d0C0e43731313A708CB607508"; // FIXME: fill this in with your contract's address/hash
 
 var BlockchainSplitwise = new ethers.Contract(contractAddress, abi, provider.getSigner());
 
@@ -129,39 +100,55 @@ var BlockchainSplitwise = new ethers.Contract(contractAddress, abi, provider.get
 // =============================================================================
 
 // TODO: Add any helper functions here!
-
-async function reconstructIOU(){
-	getAllFunctionCalls
-	return {}
+async function getCreditors(debtor){
+	// console.log('getCreditors called')
+	return new Promise(async(resolve, reject)=>{
+		let all_users = await getUsers();
+		let creditors = [];
+		await Promise.all(all_users.map(async (creditor) => {
+			const amount = await BlockchainSplitwise.lookup(debtor, creditor)
+			if (amount > 0){
+				creditors.push(creditor);
+			}
+		}));
+		resolve(creditors)
+	})
 }
 
 // TODO: Return a list of all users (creditors or debtors) in the system
 // All users in the system are everyone who has ever sent or received an IOU
 async function getUsers() {
-	console.log('getUser called')
-	// console.log(BlockchainSplitwise)
-	// let all_my_creditors = BlockchainSplitwise.creditors(contractAddress)
-	// console.log(all_my_creditors)
+	console.log('getUser called');
+	return new Promise((resolve, reject)=>{
+		getAllFunctionCalls(contractAddress, 'add_IOU').then(all_func_calls=>{
+			let all_users = new Set()
+			for (let i=0; i<all_func_calls.length; i++){
+				all_users.add(all_func_calls[i].args[0]) // add creditor
+				all_users.add(all_func_calls[i].from) // add debtor
+			}
+			all_users_array = [];
+			all_users.forEach((user)=>{
+				all_users_array.push(user);
+			})
+			
+			resolve(all_users_array);
+		})
+	})
 }
 
 // TODO: Get the total amount owed by the user specified by 'user'
 async function getTotalOwed(user) {
 	console.log('getTotalOwed called')
-	let promise = BlockchainSplitwise.creditors(contractAddress, 0).then((all_my_creditors)=>{
-		console.log('all_my_creditors', all_my_creditors);
+	return new Promise(async(resolve, reject)=>{
+		let all_users = await getUsers();
+		let total_owed = 0;
+		await Promise.all(all_users.map(async (creditor) => {
+			const amount = await BlockchainSplitwise.lookup(user, creditor)
+			total_owed += amount;
+		}));
+		console.log('total_owed', total_owed)
+		resolve(total_owed)
 	})
-	console.log(promise)
-	// let all_my_creditors = BlockchainSplitwise.creditors(contractAddress, 0)
-	// console.log('all my creditors are: ', all_my_creditors)
-	// let total_amount = 0
-	// for (let i = 0; i < all_my_creditors.length; i++){
-	// 	let owed_amount = BlockchainSplitwise.IOUs(contractAddress, all_my_creditors[i])
-	// 	console.log('amount owed to', all_my_creditors[i], 'is', owed_amount)
-	// 	total_amount += owed_amount;
-	// }
-	// console.log('total_amount', total_amount)
-	// return total_amount
-
 }
 
 // TODO: Get the last time this user has sent or received an IOU, in seconds since Jan. 1, 1970
@@ -169,9 +156,17 @@ async function getTotalOwed(user) {
 // HINT: Try looking at the way 'getAllFunctionCalls' is written. You can modify it if you'd like.
 async function getLastActive(user) {
 	console.log('getLastActive called')
-	getAllFunctionCalls(contractAddress, 'add_IOU').then(all_func=>{
-		console.log(all_func)
-	})
+	return new Promise((resolve, reject)=>{
+		getAllFunctionCalls(contractAddress, 'add_IOU').then(all_func_calls=>{
+			for (let i = 0; i < all_func_calls.length; i++){
+				if (all_func_calls[i].from == user.toLowerCase() || all_func_calls[i].args[0] == user.toLowerCase()){
+					console.log('last activity is at', all_func_calls[i].t)
+					resolve(all_func_calls[i].t);
+					break;
+				}
+			}
+		})
+	}) 
 }
 
 // TODO: add an IOU ('I owe you') to the system
@@ -181,8 +176,22 @@ async function add_IOU(creditor, amount) {
 	console.log('add_IOU called', creditor, amount)
 
 	// find cycle if any
-	BlockchainSplitwise.add_IOU(contractAddress, creditor, amount, [], 0, true)
+	let path = await doBFS(creditor, contractAddress, getCreditors);
+	console.log('path', path)
+	let cycle = []
+	let min_debt = amount;
+	if (path !== null){
+		for (let i = 0; i < path.length - 1; i++){
+			const currAmount = await BlockchainSplitwise.lookup(path[i], path[i+1])
+			if (currAmount < min_debt){
+				min_debt = currAmount
+				console.log(min_debt)
+			}
+		}
+	}
 
+	// post it to the blockchain
+	await BlockchainSplitwise.add_IOU(creditor, amount, cycle, min_debt )
 	
 }
 
@@ -296,7 +305,7 @@ getUsers().then((response)=>{
 $("#addiou").click(function() {
 	defaultAccount = $("#myaccount").val(); //sets the default account
   add_IOU($("#creditor").val(), $("#amount").val()).then((response)=>{
-		window.location.reload(false); // refreshes the page after add_IOU returns and the promise is unwrapped
+		// window.location.reload(false); // refreshes the page after add_IOU returns and the promise is unwrapped
 	})
 });
 

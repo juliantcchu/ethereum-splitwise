@@ -19,7 +19,7 @@ contract Splitwise {
 
     // add IOU and remove cycle by cycleAmount if exist
     function add_IOU(address creditor, uint32 amount, address[] memory cycle, uint32 cycleAmount ) public {
-        IOUs[msg.sender][creditor] = amount;
+        IOUs[msg.sender][creditor] += amount;
 
         //resolve cycle if exist
         for (uint32 i; i < cycle.length; i++){
