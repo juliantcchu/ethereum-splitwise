@@ -91,7 +91,7 @@ var abi = [
 abiDecoder.addABI(abi);
 // call abiDecoder.decodeMethod to use this - see 'getAllFunctionCalls' for more
 
-var contractAddress = "0x9A676e781A523b5d0C0e43731313A708CB607508"; // FIXME: fill this in with your contract's address/hash
+var contractAddress = "0x9E545E3C0baAB3E08CdfD552C960A1050f373042"; // FIXME: fill this in with your contract's address/hash
 
 var BlockchainSplitwise = new ethers.Contract(contractAddress, abi, provider.getSigner());
 
@@ -100,10 +100,10 @@ var BlockchainSplitwise = new ethers.Contract(contractAddress, abi, provider.get
 // =============================================================================
 
 // TODO: Add any helper functions here!
-async function getCreditors(debtor){
+async function getCreditors(all_users, debtor){
 	// console.log('getCreditors called')
 	return new Promise(async(resolve, reject)=>{
-		let all_users = await getUsers();
+		// let all_users = await getUsers();
 		let creditors = [];
 		await Promise.all(all_users.map(async (creditor) => {
 			const amount = await BlockchainSplitwise.lookup(debtor, creditor)
@@ -111,6 +111,7 @@ async function getCreditors(debtor){
 				creditors.push(creditor);
 			}
 		}));
+		console.log(creditors)
 		resolve(creditors)
 	})
 }
@@ -176,7 +177,8 @@ async function add_IOU(creditor, amount) {
 	console.log('add_IOU called', creditor, amount)
 
 	// find cycle if any
-	let path = await doBFS(creditor, contractAddress, getCreditors);
+	console.log('creditor', creditor)
+	let path = await doBFS(creditor, defaultAccount, getCreditors);
 	console.log('path', path)
 	let cycle = []
 	let min_debt = amount;
@@ -237,7 +239,9 @@ async function getAllFunctionCalls(addressOfContract, functionName) {
 // We've provided a breadth-first search implementation for you, if that's useful
 // It will find a path from start to end (or return null if none exists)
 // You just need to pass in a function ('getNeighbors') that takes a node (string) and returns its neighbors (as an array)
+
 async function doBFS(start, end, getNeighbors) {
+	let all_users = await getUsers()
 	var queue = [[start]];
 	while (queue.length > 0) {
 		var cur = queue.shift();
@@ -245,7 +249,7 @@ async function doBFS(start, end, getNeighbors) {
 		if (lastNode.toLowerCase() === end.toString().toLowerCase()) {
 			return cur;
 		} else {
-			var neighbors = await getNeighbors(lastNode);
+			var neighbors = await getNeighbors(all_users, lastNode);
 			for (var i = 0; i < neighbors.length; i++) {
 				queue.push(cur.concat([neighbors[i]]));
 			}
