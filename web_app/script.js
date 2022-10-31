@@ -91,7 +91,7 @@ var abi = [
 abiDecoder.addABI(abi);
 // call abiDecoder.decodeMethod to use this - see 'getAllFunctionCalls' for more
 
-var contractAddress = "0x9E545E3C0baAB3E08CdfD552C960A1050f373042"; // FIXME: fill this in with your contract's address/hash
+var contractAddress = "0x5081a39b8A5f0E35a8D959395a630b68B74Dd30f"; // FIXME: fill this in with your contract's address/hash
 
 var BlockchainSplitwise = new ethers.Contract(contractAddress, abi, provider.getSigner());
 
@@ -111,7 +111,7 @@ async function getCreditors(all_users, debtor){
 				creditors.push(creditor);
 			}
 		}));
-		console.log(creditors)
+		// console.log(creditors)
 		resolve(creditors)
 	})
 }
@@ -183,17 +183,28 @@ async function add_IOU(creditor, amount) {
 	let cycle = []
 	let min_debt = amount;
 	if (path !== null){
+		// min_debt = amount;
+		cycle = [defaultAccount]
 		for (let i = 0; i < path.length - 1; i++){
+			console.log('h1')
 			const currAmount = await BlockchainSplitwise.lookup(path[i], path[i+1])
+			console.log('h2')
+			cycle.push(path[i])
 			if (currAmount < min_debt){
 				min_debt = currAmount
 				console.log(min_debt)
 			}
 		}
 	}
+	// amount -= min_debt;
+
+	console.log('positing iou (creditor, amount, cycle, min_debt)', creditor, amount, cycle, min_debt)
 
 	// post it to the blockchain
-	await BlockchainSplitwise.add_IOU(creditor, amount, cycle, min_debt )
+	console.log('using default account as ', defaultAccount)
+	await BlockchainSplitwise.connect(provider.getSigner(defaultAccount)).add_IOU(creditor, amount, cycle, min_debt )
+	// await BlockchainSplitwise.add_IOU(creditor, amount, cycle, min_debt )
+	// await BlockchainSplitwise.add_IOU(creditor, amount, cycle, min_debt )
 	
 }
 
@@ -309,7 +320,7 @@ getUsers().then((response)=>{
 $("#addiou").click(function() {
 	defaultAccount = $("#myaccount").val(); //sets the default account
   add_IOU($("#creditor").val(), $("#amount").val()).then((response)=>{
-		// window.location.reload(false); // refreshes the page after add_IOU returns and the promise is unwrapped
+		window.location.reload(false); // refreshes the page after add_IOU returns and the promise is unwrapped
 	})
 });
 
